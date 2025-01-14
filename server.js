@@ -16,28 +16,35 @@ openai.apiKey = openaiApiKey;
 app.post('/voice', (req, res) => {
     const twiml = new VoiceResponse();
 
-    console.log('Received a call with Digits:', req.body.Digits);
-
-    if (req.body.Digits) {
-        switch (req.body.Digits) {
-            case '1':
-                twiml.say('You pressed 1. I will now tell you about our business.', { voice: 'alice' });
-                break;
-            case '2':
-                twiml.say('You pressed 2. I will help you schedule a meeting.', { voice: 'alice' });
-                break;
-            case '0':
-                twiml.say('You pressed 0. Goodbye!', { voice: 'alice' });
-                twiml.hangup();
-                break;
-            default:
-                twiml.say('Sorry, I did not understand that choice.', { voice: 'alice' });
-                twiml.redirect('/voice');
-                break;
-        }
+    // If the customer speaks (speech recognition)
+    if (req.body.SpeechResult) {
+        console.log('Received speech input:', req.body.SpeechResult);
+        
+        // Send speech input to OpenAI for a response
+        openai.Completion.create({
+            model: 'text-davinci-003', // or any other available model
+            prompt: req.body.SpeechResult,
+            max_tokens: 150
+        }).then((openaiResponse) => {
+            const aiResponse = openaiResponse.choices[0].text.trim();
+            twiml.say(aiResponse, { voice: 'alice' });
+            res.type('text/xml');
+            res.send(twiml.toString());
+        }).catch((error) => {
+            console.error('Error with OpenAI API:', error);
+            twiml.say('Sorry, I couldn\'t understand your question.', { voice: 'alice' });
+            res.type('text/xml');
+            res.send(twiml.toString());
+        });
     } else {
-        const gather = twiml.gather({ numDigits: 1 });
-        gather.say('Thanks for contacting us. If you want to know about our business, please press 1. If you want to schedule a meeting, press 2. If you want to finish, press 0.', { voice: 'alice' });
+        // If no speech result yet, gather voice input
+        const gather = twiml.gather({
+            input: 'speech',
+            timeout: 5,
+            hints: 'business, schedule, goodbye'
+        });
+        gather.say('Thanks for contacting us. How can I assist you today?', { voice: 'alice' });
+        twiml.redirect('/voice');
     }
 
     res.type('text/xml');
