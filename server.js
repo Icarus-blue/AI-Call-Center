@@ -16,6 +16,8 @@ openai.apiKey = openaiApiKey;
 app.post('/voice', (req, res) => {
     const twiml = new VoiceResponse();
 
+    console.log('Received a call with Digits:', req.body.Digits);
+
     if (req.body.Digits) {
         switch (req.body.Digits) {
             case '1':
